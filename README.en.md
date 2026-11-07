@@ -2,8 +2,6 @@
 
 Native Windows toast notifications for DeepSeek Harness: get a system reminder when a task or a background job finishes.
 
-This is a standalone DSH plugin. It has no dependency on dsh-subagent-custom-dispatch.
-
 ## Preview
 
 ![Task notification in Windows Notification Center](assets/notification-preview.png)
@@ -43,16 +41,6 @@ If Add plugin fails, link this directory into the profile and add the bundle man
     dsh plugin --profile desktop add E:\workspace\dsh\deepseek-plugin\dsh-windows-notify
 
 The profile package.json must list dsh-windows-notify in dependencies and its bundles. Profiles with HMR enabled recompose when the bundle list changes; if it does not apply automatically, restart DSH.
-
-## Appearance
-
-- Top-left app icon: the DSH Desktop AUMID `com.deepseek.dsh`, whose Start Menu shortcut supplies the official black-and-white whale.
-- assets/dsh-whale.png is only the fallback icon for a custom appId.
-- Content area: conversation name and summary on top; assets/celebrate.png below keeps its original 1:1 aspect at 256x256 and is fully visible.
-- No content appLogoOverride, so it does not duplicate the header icon or take text width; visual/binding also set branding="none" to suppress the shell's automatic app-name / New notification block where Windows honors it.
-- The Plugins-page icon uses the same celebration artwork: icon.png (512x512).
-- The artwork is local; it is never uploaded or fetched over the network.
-- Clicking calls dsh://open, handled by DSH Desktop to focus its main window; pure Web deployments can switch clickUrl to an http(s) URL.
 
 ## Default behavior
 
@@ -94,23 +82,6 @@ The first line is the conversation name, the second is the task summary (truncat
 
 Advanced fields appId, iconPath, and notifyOnAborted are available in the plugin's cordis.patch.yml or the profile's cordis.patch.yml.
 
-## Troubleshooting
-
-Run a real toast from the plugin directory:
-
-    node tests/toast-smoke.mjs
-
-If no toast appears:
-
-1. **Settings -> System -> Notifications**: enable notifications and allow **DeepSeek Harness**.
-2. Check Focus Assist / Do Not Disturb.
-3. The toast may be in Notification Center without a banner.
-4. The DSH Host must run on Windows. A browser on another machine receives the toast on the Host machine.
-
-The plugin calls Windows PowerShell 5.1 because PowerShell 7 cannot load the WinRT toast types:
-
-    C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
-
 ## How it works
 
 - The Host listens to turn/start, user/message, session/title, turn/end, and job/settled.
@@ -119,7 +90,7 @@ The plugin calls Windows PowerShell 5.1 because PowerShell 7 cannot load the Win
 - On turn/end or job/settled it builds ToastGeneric XML.
 - Foreground shell commands are registry jobs too; only shell jobs whose arguments set run_in_background raise a toast, so long foreground commands stay quiet.
 - A hidden Windows PowerShell process receives the script through -EncodedCommand, avoiding quoting and Unicode problems.
-- PowerShell registers the AppUserModelID DeepSeekHarness.Notify under HKCU and calls ToastNotificationManager.Show.
+- PowerShell reuses the DSH Desktop com.deepseek.dsh identity by default; only a custom appId registers under HKCU, then calls ToastNotificationManager.Show.
 - Clicking activates dsh://open, handled by DSH Desktop to focus its main window.
 - Delivery is fire-and-forget and never delays or fails a turn.
 
@@ -133,7 +104,7 @@ The plugin calls Windows PowerShell 5.1 because PowerShell 7 cannot load the Win
 ## Known limitations
 
 - The DSH Host must be running; no toast after the app closes.
-- Registers per Windows user; no MSIX installer.
+- A custom appId registers per Windows user; no MSIX installer.
 - Does not detect whether the DSH window is focused. Increase the minimum duration or disable completion toasts when they are noisy.
 - One setting set for all top-level sessions; no per-project rules.
 - The header icon depends on the DeepSeek Harness Start Menu shortcut; a pure Web deployment or a missing shortcut can leave the header icon empty.
@@ -150,18 +121,6 @@ The plugin calls Windows PowerShell 5.1 because PowerShell 7 cannot load the Win
 - assets/notification-preview.png: actual Notification Center capture used in this README.
 - icon.png: Plugins-page icon (512x512, same source artwork).
 - cordis.patch.yml: defaults.
-
-## Development
-
-    cd E:\workspace\dsh\deepseek-plugin\dsh-windows-notify
-    node --test tests/notify.test.mjs
-    node tests/client-smoke.mjs
-    node tests/toast-smoke.mjs
-
-Host integration smoke tests need installed dependencies:
-
-    node tests/integration-smoke.mjs
-    node tests/end-to-end.mjs
 
 ## License
 

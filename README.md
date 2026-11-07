@@ -2,8 +2,6 @@
 
 给 DeepSeek Harness 加上 Windows 系统通知：任务结束或后台任务完成时，弹一条原生 Toast 提醒。
 
-这是一个独立的 DSH 插件，和 dsh-subagent-custom-dispatch 没有依赖关系。
-
 ## 效果预览
 
 ![Windows 通知中心中的任务通知](assets/notification-preview.png)
@@ -43,16 +41,6 @@ DSH 安装时会用 pnpm 安装插件依赖 @deepseek-ai/schemastery。如果安
     dsh plugin --profile desktop add E:\workspace\dsh\deepseek-plugin\dsh-windows-notify
 
 profile 的 package.json 里需要出现这条依赖，bundles 里需要出现 dsh-windows-notify。已启用 HMR 的 profile 会在 bundle 列表变化时自动重组；如果没有自动生效，重启 DSH。
-
-## 通知外观
-
-- 左上角应用图标：默认使用 DSH Desktop 的 AUMID `com.deepseek.dsh`，Windows 从「DeepSeek Harness」开始菜单快捷方式读取官方黑白鲸鱼图标。
-- 只有配置了自定义 appId 时，才使用 assets/dsh-whale.png 作为备用图标。
-- 内容区：上方是对话名和任务总结，下方是 assets/celebrate.png（本次提供的蓝发少女图片），保持 1:1 原比例，缩到 256×256 完整显示。
-- 内容区不放 appLogoOverride，避免与头部图标重复、占用文字宽度；同时给 visual/binding 加 branding="none"，尽量去掉 Windows 自动加的“应用名 / 新通知”块。
-- 插件图标使用同一张庆祝图：icon.png（512×512）。
-- 下方图片是本地文件，不需要联网，也不会被上传。
-- 点击通知会调用 dsh://open，由 DSH Desktop 聚焦主窗口；纯 Web 部署可把 clickUrl 改成 http(s) 地址。
 
 ## 默认行为
 
@@ -96,25 +84,6 @@ profile 的 package.json 里需要出现这条依赖，bundles 里需要出现 d
 
 高级字段 appId、iconPath、notifyOnAborted 不放在可视化页面里，可以在 plugin 的 cordis.patch.yml 或 profile 的 cordis.patch.yml 中覆盖。
 
-## 测试
-
-在插件目录里直接跑一个真实 Toast：
-
-    node tests/toast-smoke.mjs
-
-不弹通知时，先检查 Windows 设置：
-
-1. **设置 → 系统 → 通知**，确认通知总开关打开，并允许 **DeepSeek Harness** 发通知。
-2. 检查专注助手 / 勿扰模式是否拦截。
-3. 通知可能只进通知中心，不弹横幅；点开通知中心确认。
-4. 确认 DSH 的 Host 进程运行在 Windows 上；浏览器在别的机器上打开 DSH 时，Toast 出现在 Host 机器。
-
-插件用 Windows PowerShell 5.1 的 WinRT Toast API。PowerShell 7 加载不了这些 WinRT 类型，所以插件固定调用：
-
-    C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
-
-Windows 10/11 默认自带 5.1。如果系统里没有它，Toast 会失败并写入 DSH 日志。
-
 ## 原理
 
 - Host 侧监听 Session 的 turn/start、user/message、session/title、turn/end 和 job/settled 事件。
@@ -123,7 +92,7 @@ Windows 10/11 默认自带 5.1。如果系统里没有它，Toast 会失败并�
 - 在 turn/end 或 job/settled 时组装 Toast XML。
 - 前台 shell 命令也会注册成 job；插件只对参数里显式 run_in_background 的 shell job 提醒，避免每条长命令都弹通知。
 - 通过 node:child_process 启动一个隐藏窗口的 Windows PowerShell，用 -EncodedCommand 传入脚本，避免中文和引号转义问题。
-- PowerShell 在 HKCU 注册 AppUserModelID（DeepSeekHarness.Notify），然后调用 ToastNotificationManager.Show。
+- PowerShell 默认复用 DSH Desktop 的 com.deepseek.dsh 标识；自定义 appId 才在 HKCU 注册，然后调用 ToastNotificationManager.Show。
 - 点击通知使用 dsh://open，由 DSH Desktop 聚焦主窗口。
 - 发送是 fire-and-forget，不会阻塞或影响任务。
 
@@ -141,7 +110,7 @@ Windows 10/11 默认自带 5.1。如果系统里没有它，Toast 会失败并�
 ## 已知限制
 
 - DSH Host 必须保持运行；应用关闭后没有通知。
-- 只按当前 Windows 用户注册通知标识，不提供 MSIX/安装包。
+- 自定义 appId 才按当前 Windows 用户注册通知标识；不提供 MSIX/安装包。
 - 不检测 DSH 窗口是否在前台；如果觉得打扰，调大最短提醒时长或关闭任务完成提醒。
 - 所有顶层会话共用一套设置，暂不支持按项目分别配置。
 - 头部图标依赖 DSH Desktop 的「DeepSeek Harness」开始菜单快捷方式；纯 Web 部署或缺少该快捷方式时，头部可能没有图标。
@@ -159,19 +128,6 @@ Windows 10/11 默认自带 5.1。如果系统里没有它，Toast 会失败并�
 - icon.png：Plugins 页使用的插件图标（512×512，与 celebrate.png 同源）。
 - cordis.patch.yml：默认配置。
 - locale/zh.json、locale/en.json：插件列表里的名称和描述。
-- tests/：单元测试、客户端冒烟测试、真实 Toast 测试。
-
-## 开发
-
-    cd E:\workspace\dsh\deepseek-plugin\dsh-windows-notify
-    node --test tests/notify.test.mjs
-    node tests/client-smoke.mjs
-    node tests/toast-smoke.mjs
-
-Host 集成冒烟测试需要先安装依赖：
-
-    node tests/integration-smoke.mjs
-    node tests/end-to-end.mjs
 
 ## 许可
 
