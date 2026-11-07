@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Windows 任务通知",
+    "description": "任务结束或后台任务完成时，弹出 Windows 系统通知；可限制最短时长、提示音与语言。"
+  }
+}

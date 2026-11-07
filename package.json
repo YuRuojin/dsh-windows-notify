@@ -1,0 +1,51 @@
+{
+  "name": "dsh-windows-notify",
+  "version": "0.1.0",
+  "description": "Windows toast notifications when a DeepSeek Harness task or background job finishes.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./icon": "./icon.png",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
+  },
+  "files": [
+    "index.js",
+    "notify.js",
+    "client.js",
+    "icon.png",
+    "assets/*.png",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "README.md",
+    "README.en.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "~3.18.5"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "plugin",
+    "windows",
+    "notification",
+    "toast"
+  ],
+  "license": "MIT"
+}

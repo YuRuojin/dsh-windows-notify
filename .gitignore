@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+.pnpm/
+
+# Build and coverage output
+dist/
+coverage/
+*.tsbuildinfo
+
+# Package artifacts
+*.tgz
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs, caches, and temporary files
+*.log
+.tmp/
+.cache/

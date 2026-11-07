@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Windows Task Notifications",
+    "description": "Raise a Windows toast when a task or background job finishes, with duration, sound, and language settings."
+  }
+}

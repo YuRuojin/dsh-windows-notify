@@ -1,0 +1,23 @@
+# Defaults for dsh-windows-notify.
+#
+# The row is inert outside Windows: the host plugin loads, logs once, and does
+# nothing. On Windows it listens for completed turns and settled background
+# jobs and raises a Windows toast through Windows PowerShell.
+- insert:
+    - id: windows-notify
+      name: 'dsh-windows-notify'
+      config:
+        enabled: true
+        minDurationMs: 8000
+        notifyOnCompleted: true
+        notifyOnError: true
+        notifyOnAborted: false
+        notifyOnJobs: true
+        notifyOnSubagents: false
+        showPromptPreview: true
+        sound: true
+        language: auto
+        appName: 'DeepSeek Harness'
+        appId: 'com.deepseek.dsh'
+        iconPath: ''
+        clickUrl: 'dsh://open'
