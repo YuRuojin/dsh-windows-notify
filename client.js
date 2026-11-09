@@ -25,12 +25,24 @@ window.__ModuleLoader__.load({
       minDurationHint: '完成类任务短于这个时长不提醒；失败和输出上限不受限制。设为 0 表示每次都提醒。',
       notifyOnCompleted: '任务完成时提醒',
       notifyOnError: '任务出错或达到输出上限时提醒',
+      notifyOnAborted: '用户中断时也提醒',
       notifyOnJobs: '后台任务结束时提醒',
       notifyOnSubagents: '子智能体结束时也提醒',
       display: '显示与行为',
       showPromptPreview: '显示任务总结',
       showPromptPreviewHint: '关闭后只显示对话名、状态和耗时。',
       sound: '播放提示音',
+      soundKind: '提示音样式',
+      soundKindHint: 'Windows 系统事件音，仅“播放提示音”打开时生效。',
+      soundDefault: '系统默认',
+      soundIm: '消息',
+      soundMail: '邮件',
+      soundReminder: '提醒',
+      soundSms: '短信',
+      imagePath: '通知配图',
+      imagePathHint: '留空用内置庆祝图；可填本地图片绝对路径或 http(s) 图片地址；填 none 隐藏配图。路径无效时回退内置图。',
+      iconPath: '通知图标路径（高级）',
+      iconPathHint: '通知头部的图标，仅在自定义通知身份 appId 时生效；留空用内置鲸鱼图标。',
       language: '通知语言',
       languageAuto: '跟随系统',
       languageZh: '中文',
@@ -42,7 +54,7 @@ window.__ModuleLoader__.load({
       save: '保存',
       saving: '保存中…',
       failed: '保存未通过：Host 拒绝了这次修改，草稿已保留。',
-      savedNote: '保存后立即生效；appId、图标路径等高级项可在 cordis.patch.yml 中调整。',
+      savedNote: '保存后立即生效；通知身份 appId 可在 cordis.patch.yml 中调整。',
     }
     const en = {
       title: 'Task notifications',
@@ -58,12 +70,24 @@ window.__ModuleLoader__.load({
       minDurationHint: 'Completed tasks shorter than this stay silent; failures and output-limit notices ignore it. Set 0 to notify every time.',
       notifyOnCompleted: 'Notify when a task completes',
       notifyOnError: 'Notify when a task fails or hits the output limit',
+      notifyOnAborted: 'Also notify when a turn is aborted',
       notifyOnJobs: 'Notify when a background job settles',
       notifyOnSubagents: 'Also notify for subagent turns',
       display: 'Display and behavior',
       showPromptPreview: 'Show the task summary',
       showPromptPreviewHint: 'When off, the toast shows only the conversation name, status, and duration.',
       sound: 'Play a notification sound',
+      soundKind: 'Sound style',
+      soundKindHint: 'A Windows system event sound; applies while “Play a notification sound” is on.',
+      soundDefault: 'System default',
+      soundIm: 'IM',
+      soundMail: 'Mail',
+      soundReminder: 'Reminder',
+      soundSms: 'SMS',
+      imagePath: 'Toast artwork',
+      imagePathHint: 'Empty keeps the bundled celebration image; a local absolute path or an http(s) image URL also works; use none to hide it. Invalid paths fall back to the bundled image.',
+      iconPath: 'Header icon path (advanced)',
+      iconPathHint: 'Icon in the toast header; applies only with a custom appId. Empty keeps the bundled whale icon.',
       language: 'Notification language',
       languageAuto: 'Follow system',
       languageZh: 'Chinese',
@@ -75,7 +99,7 @@ window.__ModuleLoader__.load({
       save: 'Save',
       saving: 'Saving…',
       failed: 'The Host refused this change; the draft was kept.',
-      savedNote: 'Saving applies immediately. Advanced fields such as appId and iconPath live in cordis.patch.yml.',
+      savedNote: 'Saving applies immediately. The notification identity appId lives in cordis.patch.yml.',
     }
 
     const T = {
@@ -131,8 +155,12 @@ window.__ModuleLoader__.load({
       return Math.max(0, Math.round(Number(value === undefined ? 8000 : value) / 1000))
     }
 
+    /** Translate function bound at apply time; props.t wins when the page provides one. */
+    let translate = null
+
     function ConfigPage(props) {
-      const { view, form, t } = props
+      const { view, form } = props
+      const t = typeof props.t === 'function' ? props.t : translate
       const state = form && form.state
       const value = state && state.value
       const revision = state && state.revision
@@ -159,6 +187,7 @@ window.__ModuleLoader__.load({
       const patch = (key, next) => setDraft((current) => ({ ...current, [key]: next }))
       const seconds = secondsOf(draft.minDurationMs)
       const language = draft.language === 'zh' || draft.language === 'en' ? draft.language : 'auto'
+      const soundKind = ['default', 'im', 'mail', 'reminder', 'sms'].includes(draft.soundKind) ? draft.soundKind : 'default'
 
       const save = async () => {
         const fields = [
@@ -166,13 +195,17 @@ window.__ModuleLoader__.load({
           'minDurationMs',
           'notifyOnCompleted',
           'notifyOnError',
+          'notifyOnAborted',
           'notifyOnJobs',
           'notifyOnSubagents',
           'showPromptPreview',
           'sound',
+          'soundKind',
           'language',
           'appName',
           'clickUrl',
+          'imagePath',
+          'iconPath',
         ]
         const base = value === undefined ? {} : value
         const ops = []
@@ -246,6 +279,12 @@ window.__ModuleLoader__.load({
             onChange: (checked) => patch('notifyOnError', checked),
           }),
           Check({
+            checked: draft.notifyOnAborted === true,
+            disabled: !writable,
+            label: t('notifyOnAborted'),
+            onChange: (checked) => patch('notifyOnAborted', checked),
+          }),
+          Check({
             checked: draft.notifyOnJobs !== false,
             disabled: !writable,
             label: t('notifyOnJobs'),
@@ -276,6 +315,39 @@ window.__ModuleLoader__.load({
             label: t('sound'),
             onChange: (checked) => patch('sound', checked),
           }),
+          Field({ label: t('soundKind'), hint: t('soundKindHint') },
+            h('select', {
+              value: soundKind,
+              disabled: !writable,
+              style: control,
+              onChange: (event) => patch('soundKind', event.target.value),
+            },
+              h('option', { value: 'default' }, t('soundDefault')),
+              h('option', { value: 'im' }, t('soundIm')),
+              h('option', { value: 'mail' }, t('soundMail')),
+              h('option', { value: 'reminder' }, t('soundReminder')),
+              h('option', { value: 'sms' }, t('soundSms')),
+            )),
+          Field({ label: t('imagePath'), hint: t('imagePathHint') },
+            h('input', {
+              type: 'text',
+              value: typeof draft.imagePath === 'string' ? draft.imagePath : '',
+              disabled: !writable,
+              placeholder: 'C:\\pictures\\celebrate.png',
+              spellCheck: false,
+              style: control,
+              onChange: (event) => patch('imagePath', event.target.value),
+            })),
+          Field({ label: t('iconPath'), hint: t('iconPathHint') },
+            h('input', {
+              type: 'text',
+              value: typeof draft.iconPath === 'string' ? draft.iconPath : '',
+              disabled: !writable,
+              placeholder: 'C:\\pictures\\app-icon.png',
+              spellCheck: false,
+              style: control,
+              onChange: (event) => patch('iconPath', event.target.value),
+            })),
           Field({ label: t('appName'), hint: t('appNameHint') },
             h('input', {
               type: 'text',
@@ -321,12 +393,11 @@ window.__ModuleLoader__.load({
     const inject = ['slots', 'locale']
 
     function apply(ctx) {
-      const t = ctx.locale.bind(NS)
+      translate = ctx.locale.bind(NS)
       ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'windows-notify: labels')
       ctx.effect(() => ctx.slots.inject('plugins.row.config', () => ctx.slots.register({
         name: 'plugins.row.config',
         key: 'dsh-windows-notify#windows-notify',
-        inject: () => ({ t }),
       }, ConfigPage)), 'windows-notify: config page')
     }
 

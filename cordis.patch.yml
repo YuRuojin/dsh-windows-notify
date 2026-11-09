@@ -16,8 +16,10 @@
         notifyOnSubagents: false
         showPromptPreview: true
         sound: true
+        soundKind: default
         language: auto
         appName: 'DeepSeek Harness'
         appId: 'com.deepseek.dsh'
         iconPath: ''
+        imagePath: ''
         clickUrl: 'dsh://open'

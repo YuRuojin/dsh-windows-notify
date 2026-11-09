@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   DEFAULT_APP_ID,
   DEFAULT_APP_NAME,
+  SOUND_SOURCES,
   buildPowerShellScript,
   buildToastXml,
   createNotificationPlanner,
@@ -13,6 +14,7 @@ import {
   normalizeText,
   projectName,
   resolveLanguage,
+  resolveSoundSource,
   sendWindowsToast,
 } from '../notify.js'
 
@@ -28,10 +30,12 @@ function config(overrides = {}) {
     notifyOnSubagents: false,
     showPromptPreview: true,
     sound: true,
+    soundKind: 'default',
     language: 'zh',
     appName: DEFAULT_APP_NAME,
     appId: DEFAULT_APP_ID,
     iconPath: '',
+    imagePath: '',
     clickUrl: '',
     ...overrides,
   }
@@ -146,6 +150,35 @@ test('buildToastXml can carry an app logo without a content image', () => {
   assert.equal(xml, '<toast><visual branding="none"><binding template="ToastGeneric" branding="none"><image placement="appLogoOverride" src="file:///C:/icon.png" /><text>done</text></binding></visual></toast>')
 })
 
+test('resolveSoundSource maps known kinds and falls back to the default', () => {
+  assert.equal(SOUND_SOURCES.default, '')
+  assert.equal(resolveSoundSource('im'), 'ms-winsoundevent:Notification.IM')
+  assert.equal(resolveSoundSource('mail'), 'ms-winsoundevent:Notification.Mail')
+  assert.equal(resolveSoundSource('reminder'), 'ms-winsoundevent:Notification.Reminder')
+  assert.equal(resolveSoundSource('sms'), 'ms-winsoundevent:Notification.SMS')
+  assert.equal(resolveSoundSource('default'), '')
+  assert.equal(resolveSoundSource('alarm'), '')
+  assert.equal(resolveSoundSource(undefined), '')
+  assert.equal(resolveSoundSource(''), '')
+})
+
+test('buildToastXml embeds a system sound source', () => {
+  const xml = buildToastXml({ title: 'done', audio: 'ms-winsoundevent:Notification.Reminder' })
+  assert.match(xml, /<audio src="ms-winsoundevent:Notification\.Reminder" \/>/u)
+  assert.ok(!xml.includes('silent="true"'))
+})
+
+test('buildToastXml lets silence win over a sound source', () => {
+  const xml = buildToastXml({ title: 'done', silent: true, audio: 'ms-winsoundevent:Notification.IM' })
+  assert.match(xml, /<audio silent="true" \/>/u)
+  assert.ok(!xml.includes('ms-winsoundevent'))
+})
+
+test('buildToastXml omits the audio element for the default sound', () => {
+  const xml = buildToastXml({ title: 'done', audio: '' })
+  assert.ok(!xml.includes('<audio'))
+})
+
 test('buildPowerShellScript carries the payload as Base64 UTF-8 JSON', () => {
   const xml = '<toast><visual><binding template="ToastGeneric"><text>你好</text></binding></visual></toast>'
   const script = buildPowerShellScript({ appId: 'My.App', appName: '我的应用', iconPath: 'C:\\icon.png', xml })
@@ -215,6 +248,24 @@ test('planner shows the conversation name and the assistant task summary', () =>
   assert.equal(notification.body, '已修复 token 刷新逻辑，并补充了回归测试。')
   assert.equal(notification.footer, '任务完成 · demo · 12 秒')
   assert.equal(notification.sound, true)
+})
+
+test('planner carries the sound style and artwork into the plan', () => {
+  const planner = createNotificationPlanner(() => config({ soundKind: 'reminder', imagePath: 'C:\\pictures\\win.png' }))
+  const notification = run(planner, session(), [
+    { type: 'turn/start', time: 1_000, data: { turn: 1 } },
+    { type: 'turn/end', time: 5_000, data: { turn: 1, reason: { kind: 'completed' } } },
+  ])
+  assert.equal(notification.sound, true)
+  assert.equal(notification.soundSrc, 'ms-winsoundevent:Notification.Reminder')
+  assert.equal(notification.imagePath, 'C:\\pictures\\win.png')
+
+  const job = createNotificationPlanner(() => config({ soundKind: 'im' })).observe(session(), {
+    type: 'job/settled',
+    time: 75_000,
+    data: jobData(),
+  })
+  assert.equal(job.soundSrc, 'ms-winsoundevent:Notification.IM')
 })
 
 test('planner prefers the live Session title service over tracked events', () => {

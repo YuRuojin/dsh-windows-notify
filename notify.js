@@ -25,6 +25,28 @@ export const DEFAULT_APP_NAME = 'DeepSeek Harness'
 /** Default minimum task duration before a toast is worth showing. */
 export const DEFAULT_MIN_DURATION_MS = 8000
 
+/**
+ * Windows system sounds a toast may reference. Windows toasts do not play
+ * custom audio files; the chooser is the supported system event sound set.
+ */
+export const SOUND_SOURCES = {
+  default: '',
+  im: 'ms-winsoundevent:Notification.IM',
+  mail: 'ms-winsoundevent:Notification.Mail',
+  reminder: 'ms-winsoundevent:Notification.Reminder',
+  sms: 'ms-winsoundevent:Notification.SMS',
+}
+
+/**
+ * Resolve one configured sound kind to its toast audio source.
+ * @param kind - configured sound kind; unknown values fall back to default.
+ * @returns the audio source, or '' for the Windows default sound.
+ */
+export function resolveSoundSource(kind) {
+  const key = typeof kind === 'string' && Object.hasOwn(SOUND_SOURCES, kind) ? kind : 'default'
+  return SOUND_SOURCES[key]
+}
+
 /** Longest title/body/footer retained from one event. */
 const MAX_LINE = 300
 
@@ -146,7 +168,7 @@ export function isSubagent(session) {
  * @param options - visible lines, sound choice, and optional click target.
  * @returns one XML document string.
  */
-export function buildToastXml({ title = '', body = '', footer = '', silent = false, clickUrl = '', appLogo = '', image = '' } = {}) {
+export function buildToastXml({ title = '', body = '', footer = '', silent = false, audio = '', clickUrl = '', appLogo = '', image = '' } = {}) {
   const lines = [title, body, footer]
     .map(line => normalizeText(line, MAX_LINE))
     .filter(Boolean)
@@ -154,14 +176,16 @@ export function buildToastXml({ title = '', body = '', footer = '', silent = fal
     ? ''
     : '<image placement="appLogoOverride" src="' + escapeXml(appLogo) + '" />'
   const activation = clickUrl === '' ? '' : ' activationType="protocol" launch="' + escapeXml(clickUrl) + '"'
-  const audio = silent ? '<audio silent="true" />' : ''
+  const audioXml = silent
+    ? '<audio silent="true" />'
+    : (audio === '' ? '' : '<audio src="' + escapeXml(audio) + '" />')
   const textXml = image === ''
     ? lines.map(line => '<text>' + escapeXml(line) + '</text>').join('')
     : lines.map((line, index) => '<text hint-style="' + (index === 0 ? 'base' : index === 1 ? 'baseSubtle' : 'captionSubtle') + '">' + escapeXml(line) + '</text>').join('')
   const content = image === ''
     ? textXml
     : textXml + '<image src="' + escapeXml(image) + '" />'
-  return '<toast' + activation + '><visual branding="none"><binding template="ToastGeneric" branding="none">' + appLogoXml + content + '</binding></visual>' + audio + '</toast>'
+  return '<toast' + activation + '><visual branding="none"><binding template="ToastGeneric" branding="none">' + appLogoXml + content + '</binding></visual>' + audioXml + '</toast>'
 }
 
 /**
@@ -341,6 +365,8 @@ function buildTurnNotification({ config, session, reason, durationMs, prompt, ti
     body: normalizeText(body, 220),
     footer: normalizeText(footer, 220),
     sound: config.sound,
+    soundSrc: resolveSoundSource(config.soundKind),
+    imagePath: config.imagePath,
     clickUrl: config.clickUrl,
     appId: config.appId,
     appName: config.appName,
@@ -370,6 +396,8 @@ function buildJobNotification({ config, session, data, durationMs, title, langua
     body: label,
     footer: normalizeText(footer, 220),
     sound: config.sound,
+    soundSrc: resolveSoundSource(config.soundKind),
+    imagePath: config.imagePath,
     clickUrl: config.clickUrl,
     appId: config.appId,
     appName: config.appName,

@@ -17,7 +17,8 @@ Actual Notification Center capture: conversation name, task summary, status/clic
 - The top-left uses the DSH Desktop AUMID (com.deepseek.dsh), so Windows reads the black-and-white whale from the DeepSeek Harness Start Menu shortcut; the content no longer repeats a large logo.
 - Text on top and a compact 1:1 artwork below it, with no overlap.
 - The conversation name and task summary, with long text truncated.
-- Optional sound.
+- Sound style selectable: system default, IM, Mail, Reminder, SMS, or fully silent.
+- Custom artwork: a local image path, an http(s) image URL, or none to hide it.
 - Clicking focuses or opens the DeepSeek Harness client through dsh://open instead of a localhost browser tab.
 - Configuration page in Plugins; saves apply immediately.
 - Silent no-op outside Windows.
@@ -49,7 +50,7 @@ The profile package.json must list dsh-windows-notify in dependencies and its bu
 | Top-level turn completed | yes | Only after the minimum duration |
 | Top-level turn failed | yes | Includes the provider failure summary; ignores the minimum duration |
 | Top-level turn hit output limit | yes | Suggests continuing the task; ignores the minimum duration |
-| Turn aborted by the user | no | Enable notifyOnAborted in cordis.patch.yml to opt in |
+| Turn aborted by the user | no | Enable "Also notify when a turn is aborted" on the Configure page |
 | Background job completed | yes | Only explicit run_in_background jobs; after the minimum duration |
 | Background job failed | yes | Only explicit run_in_background jobs; includes the exit code or failure detail; ignores the minimum duration |
 | Background job killed | no | Intentional cancellation stays silent |
@@ -70,17 +71,21 @@ The first line is the conversation name, the second is the task summary (truncat
 | --- | --- | --- |
 | Enable notifications | true | master switch |
 | Minimum duration for completions (seconds) | 8 | completed tasks shorter than this stay silent; failures and output-limit notices ignore it; 0 notifies every completion |
-| Notify when a task completes | true | completed turns |
+| Notify when a task completes | true | completed turns; turn this off if a toast per working round is too noisy |
 | Notify when a task fails or hits the output limit | true | error and max-tokens turns |
+| Also notify when a turn is aborted | false | aborted turns |
 | Notify when a background job settles | true | job/settled |
 | Also notify for subagent turns | false | subagent turns too |
 | Show the task summary | true | when off, only the conversation name, status, and duration |
 | Play a notification sound | true | turn off for silent toasts |
+| Sound style | system default | system default / IM / Mail / Reminder / SMS |
 | Notification language | follow system | Chinese / English / follow system |
 | App name above the toast | DeepSeek Harness | source name shown by Windows |
 | Open this address when the toast is clicked | dsh://open | focuses/opens DeepSeek Harness by default; http/https also work |
+| Toast artwork | bundled image | a local absolute path or an http(s) URL; none hides it; invalid paths fall back to the bundled image |
+| Header icon path | bundled whale | toast header icon; applies only with a custom appId |
 
-Advanced fields appId, iconPath, and notifyOnAborted are available in the plugin's cordis.patch.yml or the profile's cordis.patch.yml.
+Only the notification identity appId still lives in the plugin's cordis.patch.yml or the profile's cordis.patch.yml; every other setting is editable on the Configure page.
 
 ## How it works
 
@@ -90,6 +95,8 @@ Advanced fields appId, iconPath, and notifyOnAborted are available in the plugin
 - On turn/end or job/settled it builds ToastGeneric XML.
 - Foreground shell commands are registry jobs too; only shell jobs whose arguments set run_in_background raise a toast, so long foreground commands stay quiet.
 - A hidden Windows PowerShell process receives the script through -EncodedCommand, avoiding quoting and Unicode problems.
+- Sounds are Windows system event sounds (ms-winsoundevent): default, IM, Mail, Reminder, SMS; custom audio files are not supported by the Toast API.
+- The artwork src accepts file:// URLs for local files and http(s) URLs; local paths are resolved and checked before sending, invalid paths fall back to the bundled image, and none removes the artwork.
 - PowerShell reuses the DSH Desktop com.deepseek.dsh identity by default; only a custom appId registers under HKCU, then calls ToastNotificationManager.Show.
 - Clicking activates dsh://open, handled by DSH Desktop to focus its main window.
 - Delivery is fire-and-forget and never delays or fails a turn.

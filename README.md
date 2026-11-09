@@ -17,7 +17,8 @@
 - 左上角使用 DSH Desktop 的 AUMID（com.deepseek.dsh），从「DeepSeek Harness」开始菜单快捷方式读取黑白鲸鱼图标；内容区不再重复放大图标。
 - 内容区文字在上，1:1 原图缩小后放在文字下方，不与文字重叠。
 - 文字显示对话名和该次任务的总结，过长自动省略。
-- 可选提示音。
+- 提示音可选：系统默认、消息、邮件、提醒、短信，或整体静音。
+- 配图可自定义：本地图片路径、http(s) 图片地址，或填 none 隐藏。
 - 点击通知聚焦/打开 DeepSeek Harness 客户端（dsh://open），不再用浏览器打开 localhost。
 - 插件页面可视化配置，保存即生效。
 - 非 Windows 环境自动静默，不报错。
@@ -49,7 +50,7 @@ profile 的 package.json 里需要出现这条依赖，bundles 里需要出现 d
 | 顶层会话任务完成 | 是 | 任务运行超过 8 秒才提醒 |
 | 顶层会话任务出错 | 是 | 附带错误信息摘要；不受最短时长限制 |
 | 顶层会话达到输出上限 | 是 | 提示可以继续让它做；不受最短时长限制 |
-| 用户主动中断 | 否 | 可在 cordis.patch.yml 里打开 notifyOnAborted |
+| 用户主动中断 | 否 | 可在插件页打开“用户中断时也提醒” |
 | 后台任务完成 | 是 | 仅显式 run_in_background 的任务；运行超过 8 秒才提醒 |
 | 后台任务失败 | 是 | 仅显式 run_in_background 的任务；附带退出码或失败原因；不受最短时长限制 |
 | 后台任务被取消 | 否 | 主动 kill 不提醒 |
@@ -72,17 +73,21 @@ profile 的 package.json 里需要出现这条依赖，bundles 里需要出现 d
 | --- | --- | --- |
 | 启用通知 | true | 总开关 |
 | 完成类提醒最短时长（秒） | 8 | 完成类任务短于该时长不提醒；失败和输出上限不受限制；0 表示每次都提醒 |
-| 任务完成时提醒 | true | completed 轮次 |
+| 任务完成时提醒 | true | completed 轮次；不想让 agent 每个环节都弹窗就关掉它 |
 | 任务出错或达到输出上限时提醒 | true | error 和 max-tokens 轮次 |
+| 用户中断时也提醒 | false | aborted 轮次 |
 | 后台任务结束时提醒 | true | job/settled |
 | 子智能体结束时也提醒 | false | 子智能体轮次也弹通知 |
 | 显示任务总结 | true | 关闭后只显示对话名、状态和耗时 |
 | 播放提示音 | true | 关闭后静音 |
+| 提示音样式 | 系统默认 | 系统默认 / 消息 / 邮件 / 提醒 / 短信 |
 | 通知语言 | 跟随系统 | 中文 / English / 跟随系统 |
 | 通知中的应用名称 | DeepSeek Harness | Windows 通知顶部显示的应用名 |
 | 点击通知打开的地址 | dsh://open | 默认聚焦/打开 DeepSeek Harness；也支持 http/https |
+| 通知配图 | 内置庆祝图 | 本地图片绝对路径或 http(s) 地址；填 none 隐藏配图；路径无效回退内置图 |
+| 通知图标路径 | 内置鲸鱼图 | 通知头部图标，仅自定义 appId 时生效 |
 
-高级字段 appId、iconPath、notifyOnAborted 不放在可视化页面里，可以在 plugin 的 cordis.patch.yml 或 profile 的 cordis.patch.yml 中覆盖。
+只有通知身份 appId 仍在 cordis.patch.yml 或 profile 的 cordis.patch.yml 中覆盖；其余配置都在插件页 Configure 里可改。
 
 ## 原理
 
@@ -91,6 +96,8 @@ profile 的 package.json 里需要出现这条依赖，bundles 里需要出现 d
 - 对话名从 Session title service 读取；任务总结取本轮最后一条 assistant 文本，过长自动省略。
 - 在 turn/end 或 job/settled 时组装 Toast XML。
 - 前台 shell 命令也会注册成 job；插件只对参数里显式 run_in_background 的 shell job 提醒，避免每条长命令都弹通知。
+- 提示音走 Windows 系统事件音（ms-winsoundevent）：默认、消息、邮件、提醒、短信；不支持自定义音频文件，这是 Toast API 的限制。
+- 配图 src 支持本地文件的 file:// URL 与 http(s) 地址；本地路径在发送前解析并校验存在性，无效路径回退内置庆祝图，none 移除配图。
 - 通过 node:child_process 启动一个隐藏窗口的 Windows PowerShell，用 -EncodedCommand 传入脚本，避免中文和引号转义问题。
 - PowerShell 默认复用 DSH Desktop 的 com.deepseek.dsh 标识；自定义 appId 才在 HKCU 注册，然后调用 ToastNotificationManager.Show。
 - 点击通知使用 dsh://open，由 DSH Desktop 聚焦主窗口。

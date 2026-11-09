@@ -44,10 +44,12 @@ export const Config = z.object({
   notifyOnSubagents: z.boolean().default(false).volatile(),
   showPromptPreview: z.boolean().default(true).volatile(),
   sound: z.boolean().default(true).volatile(),
+  soundKind: z.union(['default', 'im', 'mail', 'reminder', 'sms']).default('default').volatile(),
   language: z.union(['auto', 'zh', 'en']).default('auto').volatile(),
   appName: z.string().min(1).default(DEFAULT_APP_NAME).volatile(),
   appId: z.string().pattern(/^[A-Za-z0-9._-]+$/u).default(DEFAULT_APP_ID).volatile(),
   iconPath: z.string().default('').volatile(),
+  imagePath: z.string().default('').volatile(),
   clickUrl: z.string().default('dsh://open').volatile(),
 })
 
@@ -100,6 +102,7 @@ export function normalizeConfig(config) {
   const appName = readString(config, 'appName', DEFAULT_APP_NAME).slice(0, 64) || DEFAULT_APP_NAME
   const appId = readString(config, 'appId', DEFAULT_APP_ID)
   const language = readString(config, 'language', 'auto')
+  const soundKind = readString(config, 'soundKind', 'default')
   return {
     enabled: readBoolean(config, 'enabled', true),
     minDurationMs: readInteger(config, 'minDurationMs', DEFAULT_MIN_DURATION_MS, 0, 86_400_000),
@@ -110,14 +113,37 @@ export function normalizeConfig(config) {
     notifyOnSubagents: readBoolean(config, 'notifyOnSubagents', false),
     showPromptPreview: readBoolean(config, 'showPromptPreview', true),
     sound: readBoolean(config, 'sound', true),
+    soundKind: ['default', 'im', 'mail', 'reminder', 'sms'].includes(soundKind) ? soundKind : 'default',
     language: language === 'zh' || language === 'en' ? language : 'auto',
     appName,
     appId: appId === '' || appId === 'DeepSeekHarness.Notify'
       ? DEFAULT_APP_ID
       : (/^[A-Za-z0-9._-]+$/u.test(appId) ? appId : DEFAULT_APP_ID),
     iconPath: readString(config, 'iconPath', ''),
+    imagePath: readString(config, 'imagePath', ''),
     clickUrl: clickTarget(readString(config, 'clickUrl', 'dsh://open')) || 'dsh://open',
   }
+}
+
+/**
+ * Resolve one configured artwork value to a toast image source.
+ * Empty keeps the bundled celebration image, `none` removes the artwork, an
+ * http(s) or file URL passes through, and an existing local path becomes a
+ * file URL. Anything else falls back to the bundled image.
+ * @param value - raw imagePath configuration value.
+ * @returns a toast image source, or '' to show no artwork.
+ */
+export function resolveImagePath(value) {
+  const raw = typeof value === 'string' ? value.trim() : ''
+  if (raw === '') return CONTENT_IMAGE_URI
+  if (/^none$/iu.test(raw)) return ''
+  if (/^(?:https?|file):\/\/\S+$/iu.test(raw)) return raw
+  try {
+    if (raw !== '' && existsSync(raw)) return pathToFileURL(raw).href
+  } catch {
+    // A malformed path cannot shadow the bundled artwork.
+  }
+  return CONTENT_IMAGE_URI
 }
 
 /**
@@ -166,8 +192,9 @@ export function apply(ctx, config) {
         body: notification.body,
         footer: notification.footer,
         silent: notification.sound === false,
+        audio: notification.soundSrc ?? '',
         clickUrl: notification.clickUrl,
-        image: CONTENT_IMAGE_URI,
+        image: resolveImagePath(notification.imagePath),
       })
     } catch (error) {
       ctx.logger?.warn?.('[windows-notify] could not build toast XML: ' + String(error))
